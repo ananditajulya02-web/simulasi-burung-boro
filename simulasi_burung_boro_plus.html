@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Laboratorium Simulasi Burung Boro</title>
+<style>
+:root{--ink:#18324a;--blue:#2475b8;--sky:#eaf7ff;--line:#c9e1f1}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#eaf7ff,#f7fbff);font-family:system-ui,Arial,sans-serif;color:var(--ink)}
+main{max-width:1000px;margin:auto;padding:16px}
+header{text-align:center;padding:8px 0 14px}h1{margin:0;color:var(--blue);font-size:clamp(24px,5vw,36px)}header p{margin:7px 0}
+.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px;margin:12px 0;box-shadow:0 5px 16px #c8deed55}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:12px}
+label{display:block;font-weight:650;font-size:14px}input,select{display:block;width:100%;margin-top:6px;padding:10px;border:1px solid #b9d3e5;border-radius:10px;background:#fff;color:var(--ink);font-size:16px}
+button{background:var(--blue);color:white;border:0;border-radius:12px;padding:12px 17px;font-size:16px;font-weight:700;margin:12px 8px 0 0;cursor:pointer}
+button.secondary{background:#e7f3fc;color:var(--blue)}canvas{display:block;width:100%;height:auto;border-radius:14px;border:1px solid var(--line);background:#e8f7ff}
+#summary{text-align:center;line-height:1.7;font-weight:650;margin-top:12px}
+table{width:100%;border-collapse:collapse;margin-top:12px;font-size:14px}th,td{text-align:left;padding:9px;border-bottom:1px solid #e1edf5}th{background:#eff8ff}
+.formulas{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.formula{background:#f2f9ff;border-radius:12px;padding:12px;font-size:14px}
+small{color:#58728a}
+@media(max-width:500px){main{padding:10px}.card{padding:12px}table{font-size:12px}th,td{padding:6px}}
+</style></head>
+<body><main>
+<header><h1>🐦 Laboratorium Simulasi Burung Boro</h1><p>Eksplorasi gerak parabola dengan sudut, kecepatan, dan gravitasi yang dapat diatur.</p></header>
+<section class="card">
+<h2>⚙️ Pengaturan Simulasi</h2>
+<div class="controls">
+<label>Sudut peluncuran S (°)<input id="angle" type="number" min="0" max="90" value="37" step="1"></label>
+<label>Kecepatan awal V₀ (m/s)<input id="speed" type="number" min="1" max="250" value="100" step="1"></label>
+<label>Gravitasi g (m/s²)<input id="gravity" type="number" min="0.1" max="30" value="10" step="0.1"></label>
+<label>Tinggi pohon (m)<input id="tree" type="number" min="0" max="500" value="100" step="1"></label>
+<label>Burung yang diluncurkan<select id="birds" multiple size="4">
+<option value="boro" selected>🐦 Boro (1.00×)</option><option value="pipit" selected>🐤 Pipit (0.80×)</option><option value="merpati" selected>🕊️ Merpati (0.95×)</option><option value="elang" selected>🦅 Elang (1.15×)</option><option value="beo" selected>🦜 Beo (0.90×)</option>
+</select><small>Pilih satu atau beberapa (tekan/ketuk pilihan).</small></label>
+</div>
+<button id="launch">🚀 Luncurkan Burung</button><button class="secondary" id="reset">↺ Reset</button>
+</section>
+<section class="card">
+<h2>🌤️ Animasi Lintasan</h2><canvas id="scene" width="900" height="460"></canvas><div id="summary">Atur parameter lalu tekan Luncurkan Burung.</div>
+<div id="tableWrap"></div>
+</section>
+<section class="card">
+<h2>📘 Rumus Gerak Parabola</h2>
+<div class="formulas">
+<div class="formula"><b>Komponen horizontal</b><br>Vₓ = V₀ cos(S)</div>
+<div class="formula"><b>Komponen vertikal</b><br>Vᵧ = V₀ sin(S)</div>
+<div class="formula"><b>Waktu total (kembali ke tanah)</b><br>t = 2V₀ sin(S) / g</div>
+<div class="formula"><b>Jarak horizontal</b><br>x = V₀² sin(2S) / g</div>
+<div class="formula"><b>Ketinggian maksimum</b><br>H = V₀² sin²(S) / (2g)</div>
+<div class="formula"><b>Ketinggian setiap waktu</b><br>y(t) = V₀ sin(S)t − ½gt²</div>
+</div>
+<p><small>Asumsi: peluncuran dari permukaan tanah, tanpa hambatan udara, dan burung mendarat pada ketinggian yang sama dengan titik awal. Faktor kecepatan tiap burung adalah variasi untuk membandingkan lintasan dalam simulasi.</small></p>
+</section>
+</main>
+<script>
+const cvs=document.getElementById('scene'),ctx=cvs.getContext('2d');
+const species=[{id:'boro',name:'Boro',emoji:'🐦',factor:1},{id:'pipit',name:'Pipit',emoji:'🐤',factor:.8},{id:'merpati',name:'Merpati',emoji:'🕊️',factor:.95},{id:'elang',name:'Elang',emoji:'🦅',factor:1.15},{id:'beo',name:'Beo',emoji:'🦜',factor:.9}];
+let raf=null;
+function background(treeH,scaleY){
+ ctx.clearRect(0,0,900,460);
+ // sky decoration
+ ctx.fillStyle='#dff3ff';ctx.fillRect(0,0,900,460);
+ ctx.fillStyle='#fff';for(let [x,y] of [[120,75],[350,50],[600,90]]){ctx.beginPath();ctx.arc(x,y,22,0,Math.PI*2);ctx.arc(x+25,y-8,28,0,Math.PI*2);ctx.arc(x+50,y,20,0,Math.PI*2);ctx.fill();}
+ ctx.fillStyle='#bde5a4';ctx.fillRect(0,380,900,80);
+ ctx.fillStyle='#8b5b36';ctx.fillRect(765,235,28,145);
+ ctx.fillStyle='#399b60';ctx.beginPath();ctx.arc(780,205,75,0,Math.PI*2);ctx.arc(730,225,55,0,Math.PI*2);ctx.arc(830,225,55,0,Math.PI*2);ctx.fill();
+ ctx.fillStyle='#244d37';ctx.font='17px Arial';ctx.fillText('Pohon target',735,405);
+ ctx.fillStyle='#a97642';ctx.fillRect(50,350,90,30);ctx.fillStyle='#244d37';ctx.fillText('Ketapel',55,340);
+ ctx.strokeStyle='#5d7d94';ctx.lineWidth=1;ctx.setLineDash([5,5]);ctx.beginPath();ctx.moveTo(145,380);ctx.lineTo(740,380);ctx.stroke();ctx.setLineDash([]);
+}
+function getInputs(){
+ const S=Number(document.getElementById('angle').value),V=Number(document.getElementById('speed').value),g=Number(document.getElementById('gravity').value),Y=Number(document.getElementById('tree').value);
+ const selected=[...document.getElementById('birds').selectedOptions].map(o=>species.find(s=>s.id===o.value));
+ if(!Number.isFinite(S)||S<0||S>90||!Number.isFinite(V)||V<=0||!Number.isFinite(g)||g<=0||!Number.isFinite(Y)||Y<0||!selected.length)throw Error('Periksa input: sudut 0–90°, V dan g harus positif, tinggi tidak negatif, dan pilih minimal satu burung.');
+ return {S,V,g,Y,selected};
+}
+function metrics(S,V,g,Y,bird){
+ let v=V*bird.factor,rad=S*Math.PI/180;
+ let vx=v*Math.cos(rad),vy=v*Math.sin(rad),t=2*vy/g,range=vx*t,H=vy*vy/(2*g);
+ return {v,vx,vy,t,range,H,reach:H>=Y};
+}
+function launch(){
+ if(raf)cancelAnimationFrame(raf);
+ let data;try{data=getInputs()}catch(e){document.getElementById('summary').textContent=e.message;return;}
+ const {S,V,g,Y,selected}=data, results=selected.map(b=>({...b,...metrics(S,V,g,Y,b)}));
+ const maxRange=Math.max(...results.map(r=>r.range),1),maxH=Math.max(...results.map(r=>r.H),Y,1);
+ const sx=610/maxRange,sy=255/maxH,startX=145,startY=380;
+ background(Y,sy);
+ const colors=['#ef9c36','#3a83c6','#5aaf7a','#9b71c5','#e16e85'];
+ // draw paths
+ results.forEach((r,i)=>{ctx.strokeStyle=colors[i%colors.length];ctx.lineWidth=2.5;ctx.beginPath();
+ for(let j=0;j<=100;j++){let q=j/100,t=r.t*q,x=startX+r.vx*t*sx,y=startY-(r.vy*t-.5*g*t*t)*sy;if(j===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.stroke();});
+ const duration=2600,started=performance.now();
+ document.getElementById('summary').textContent='Burung-burung sedang meluncur...';
+ function animate(now){
+   const p=Math.min((now-started)/duration,1);
+   background(Y,sy);
+   results.forEach((r,i)=>{
+    ctx.strokeStyle=colors[i%colors.length];ctx.lineWidth=2.5;ctx.beginPath();
+    for(let j=0;j<=100;j++){let q=j/100,t=r.t*q,x=startX+r.vx*t*sx,y=startY-(r.vy*t-.5*g*t*t)*sy;if(j===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}ctx.stroke();
+    let t=r.t*p,x=startX+r.vx*t*sx,y=startY-(r.vy*t-.5*g*t*t)*sy;
+    ctx.font='30px serif';ctx.fillText(r.emoji,Math.max(0,Math.min(x-14,865)),Math.max(35,Math.min(y+8,370)));
+   });
+   if(p<1)raf=requestAnimationFrame(animate);
+   else showResults(results,S,g,Y);
+ }
+ raf=requestAnimationFrame(animate);
+}
+function showResults(results,S,g,Y){
+ document.getElementById('summary').innerHTML=`Sudut: <b>${S}°</b> · Gravitasi: <b>${g} m/s²</b> · Tinggi pohon: <b>${Y} m</b>`;
+ let rows=results.map(r=>`<tr><td>${r.emoji} ${r.name}</td><td>${r.v.toFixed(2)}</td><td>${r.vx.toFixed(2)}</td><td>${r.vy.toFixed(2)}</td><td>${r.t.toFixed(2)}</td><td>${r.range.toFixed(2)}</td><td>${r.H.toFixed(2)}</td><td>${r.reach?'✅ Bisa (1)':'❌ Belum (0)'}</td></tr>`).join('');
+ document.getElementById('tableWrap').innerHTML=`<div style="overflow-x:auto"><table><thead><tr><th>Burung</th><th>V awal</th><th>Vₓ</th><th>Vᵧ</th><th>Waktu (s)</th><th>Jarak (m)</th><th>H maks (m)</th><th>Target pohon</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+document.getElementById('launch').addEventListener('click',launch);
+document.getElementById('reset').addEventListener('click',()=>{if(raf)cancelAnimationFrame(raf);document.getElementById('angle').value=37;document.getElementById('speed').value=100;document.getElementById('gravity').value=10;document.getElementById('tree').value=100;[...document.getElementById('birds').options].forEach(o=>o.selected=true);background(100,1);document.getElementById('summary').textContent='Pengaturan direset. Tekan Luncurkan Burung.';document.getElementById('tableWrap').innerHTML='';});
+background(100,1);
+</script></body></html>
